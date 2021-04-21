@@ -4,10 +4,13 @@ layout(location=0) out vec4 f_color;
 
 layout(set=0, binding=0)
 uniform Uniforms {
+    vec2 mouse;
     int width;
     int height;
     float time;
 };
+
+#define PI 3.1415926538
 
 const int NUM_STEPS = 128; // doesn't matter much right now
 const float MIN_DIST = 0.001; // threshold for intersection
@@ -130,11 +133,14 @@ float scene_floorless(vec3 pos) {
     );
 
     d = min(d, sdSphere(pos, vec3(2, 0.5, -2), 0.5));
-    d = min(d, sdSphere(pos, vec3(4, 1.0, 3), 1.0));
+    d = min(d, sdSphere(pos, vec3(3, 1.0, 3), 1.0));
     d = min(d, sdSphere(pos, vec3(-3, 1.5, 2), 1.5));
-    d = min(d, sdSphere(pos, vec3(-4, 1.0, 0), 1.0));
+    d = min(d, sdSphere(pos, vec3(-3, 1.0, 0), 1.0));
     d = min(d, sdSphere(pos, vec3(-2, 0.5, -1), 0.5));
     d = min(d, sdSphere(pos, vec3(-2, 0.25, -2.25), 0.25));
+
+    // origin
+    d = min(d, sdSphere(pos, vec3(0, 0, 0), 0.05));
 
     return d;
     // return sdSphere(pos, vec3(1.0, 0.5, 0.0), 1.0);
@@ -236,10 +242,25 @@ Ray march(vec3 origin, vec3 direction) {
     
 }
 
+float cosine_wave(float theta, float min, float max) {
+    return (-cos(theta) + 1)/2 * (max-min) + min;
+}
+
 void main()
 {
     vec2 iResolution = vec2(float(width), float(height));
     float iTime = time;
+
+    // for simplicity we're assuming the camera is always looking at the origin (0,0,0)
+    // camera Y-rotation angle in radians
+    // float cam_rot_x = cosine_wave(time/2, 0.1, PI/4);
+    // float cam_rot_y = time / 8;
+    float cam_rot_x = mix(0, PI/4, mouse.y/2+0.5);
+    float cam_rot_y = mix(PI, -PI, mouse.x/2+0.5);
+    mat3 rot_x = rotateX_matrix(-cam_rot_x);
+    mat3 rot_y = rotateY_matrix(cam_rot_y);
+    mat3 cam_rotation = rot_y * rot_x;
+    vec3 camPos = cam_rotation * vec3(0.0, 0, -8.0);
 
     int num_levels = 8;
     vec3 color = vec3(0.0);
@@ -259,14 +280,10 @@ void main()
         }
         // f_color = vec4(mod(uv.x, 1.0), mod(uv.y, 1.0), 0.0, 1.0);
         
-        // camera Y-rotation angle in radians
-        // float cam_rot_y = time / 8;
-
-        vec3 camPos = vec3(0.0, 2.5, -8.0);
         // vec3 rayDir = normalize(vec3(uv, 1.0));
         // this fixes the horizontal fov to 90 degrees
         float max_u = iResolution.x / iResolution.y;
-        vec3 rayDir = normalize(vec3(uv, max_u));
+        vec3 rayDir = cam_rotation * normalize(vec3(uv, max_u));
         
         Ray marched = march(camPos, rayDir);
 

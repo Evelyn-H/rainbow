@@ -13,6 +13,7 @@ use winit::{
 // This is so we can store this in a buffer
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
+    mouse: [f32; 2],
     width: u32,
     height: u32,
     time: f32,
@@ -24,6 +25,7 @@ impl Uniforms {
             width,
             height,
             time: 0.0,
+            mouse: [0.0, 0.0],
         }
     }
 }
@@ -250,6 +252,10 @@ fn main() {
     let mut last_render_time = std::time::Instant::now();
     let mut frame_count = 0;
     let mut frame_count_start = std::time::Instant::now();
+
+    let mut mouse_pos = winit::dpi::PhysicalPosition::<f64>::new(0.0, 0.0);
+    let mut mouse_down = false;
+
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
@@ -258,6 +264,28 @@ fn main() {
             } if window_id == window.id() => {
                 if !state.input(event) {
                     match event {
+                        // Mous input
+                        WindowEvent::CursorMoved {position, ..} => {
+                            mouse_pos = *position;
+                            mouse_pos.x = mouse_pos.x.clamp(0.0, state.uniforms.width as f64);
+                            mouse_pos.y = mouse_pos.y.clamp(0.0, state.uniforms.height as f64);
+                            if mouse_down {
+                                state.uniforms.mouse = [mouse_pos.x as f32 / state.uniforms.width as f32 * 2.0 - 1.0, mouse_pos.y as f32 / state.uniforms.height as f32 * 2.0 - 1.0];
+                            };
+                        },
+
+                        WindowEvent::MouseInput {state: winit::event::ElementState::Pressed, button: winit::event::MouseButton::Left, ..} => {
+                            mouse_down = true;
+                            // update the mouse position in the uniforms
+                            state.uniforms.mouse = [mouse_pos.x as f32 / state.uniforms.width as f32 * 2.0 - 1.0, mouse_pos.y as f32 / state.uniforms.height as f32 * 2.0 - 1.0];
+                            // state.uniforms.mouse = [mouse_pos.x as f32, mouse_pos.y as f32];
+                        },
+                        WindowEvent::MouseInput {state: winit::event::ElementState::Released, button: winit::event::MouseButton::Left, ..} => {
+                            mouse_down = false;
+                        }
+
+
+                        // General window management stuff
                         WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                         WindowEvent::KeyboardInput { input, .. } => match input {
                             KeyboardInput {
